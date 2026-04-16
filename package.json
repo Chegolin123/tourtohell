@@ -1,0 +1,19 @@
+{
+  "name": "tourtohell",
+  "version": "1.0.0",
+  "description": "Tour to Hell - экстремальный туроператор",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "cd server && npm install && node server.js",
+    "build": "cd client && npm install && npm run build",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start"
+  },
+  "keywords": ["tourism", "extreme", "travel"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

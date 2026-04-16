@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: tourtohell-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword123}
+      MYSQL_DATABASE: ${DB_NAME:-tourtohell}
+      MYSQL_USER: ${DB_USER:-tourtohell_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-tourtohell_pass}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - tourtohell-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: tourtohell-server
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DB_HOST: mysql
+      DB_USER: ${DB_USER:-tourtohell_user}
+      DB_PASSWORD: ${DB_PASSWORD:-tourtohell_pass}
+      DB_NAME: ${DB_NAME:-tourtohell}
+      JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_this}
+      CLIENT_URL: https://helltour.chickenkiller.com
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./server/uploads:/app/uploads
+    networks:
+      - tourtohell-network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: https://helltour.chickenkiller.com/api
+    container_name: tourtohell-client
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    networks:
+      - tourtohell-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: tourtohell-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./client/build:/usr/share/nginx/html
+      - ./ssl:/etc/nginx/ssl
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - client
+      - server
+    networks:
+      - tourtohell-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: tourtohell-certbot
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  mysql_data:
+
+networks:
+  tourtohell-network:
+    driver: bridge
